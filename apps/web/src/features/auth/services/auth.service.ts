@@ -55,7 +55,10 @@ export async function signUpWithEmail(input: { email: string; password: string }
     name: input.email.split('@')[0] || input.email,
     callbackURL: appUrl('/login?verified=1'),
   });
-  if (result.error) throw new Error(result.error.message ?? '');
+  // The code lets the form say why the gate refused the address, in the visitor's language.
+  if (result.error) {
+    throw Object.assign(new Error(result.error.message ?? ''), { code: result.error.code });
+  }
 }
 
 // Sends the password reset link. The address is not confirmed to exist: better-auth

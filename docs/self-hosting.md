@@ -88,8 +88,9 @@ The first sign-in creates the account, and the registration mode under **Authent
 decides whether it may: `open` creates it, `invite only` needs a pending invite that has
 not expired, `closed` refuses it. Invites expire after the days set under **Authentication**
 (7 by default, 0 for never); an expired one is renewed from the member list under a new
-link, and a sign-in refused because the invite expired is told so. On a closed instance,
-provision people with SCIM.
+link. A refused sign-in returns to the sign-in page, which says why: the instance is
+closed, it needs an invite, or the invite expired. On a closed instance, provision people
+with SCIM.
 
 A sign-in whose address already has an account joins that account instead of creating a
 second one. That needs the provider to report the address as verified and the account to
