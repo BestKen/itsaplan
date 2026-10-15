@@ -33,7 +33,8 @@ workspace settings can change them without a restart. Read them
 through this module — never inline a query on `app_setting` / `app_secret` elsewhere.
 
 - `app_setting` key `auth` → `{ registration, requireEmailVerification, magicLink,
-  emailPassword }`.
+  emailPassword, trustProviderEmails, personalWorkspaces, inviteTtlDays,
+  allowedEmailDomains }`.
 - `app_secret` keys `auth.email`, `auth.google` and `auth.oidc` → the mail provider, Google
   and the OIDC provider, set in god mode; `workspace.<id>.scim` → a workspace's SCIM token,
   set by the workspace owner. All encrypted with `@repo/crypto`, each with a `redacted`
@@ -51,9 +52,9 @@ Invites are created and revoked inside a team, so there is no instance-level inv
 table and god mode has no invite section — do not add one; god mode only sets how long
 they last.
 
-`hooks.before` gates `/sign-up/email` (closed → 403, invite → no pending, unexpired
-invite for that address → 403) and holds back `/sign-in/email` for an unconfirmed address while
-verification is required. The requirement never outlives the mail provider: the api
+`hooks.before` gates `/sign-up/email` (closed → 403, an address outside
+`allowedEmailDomains` → 403, invite → no pending, unexpired invite for that address → 403)
+and holds back `/sign-in/email` for an unconfirmed address while verification is required. The requirement never outlives the mail provider: the api
 refuses to turn it on without one, and `setEmailSettings` clears it when the provider
 is removed, so the setting alone is what the gate, the sign-up endpoint and the
 public `/auth-config` read — none of them checks the provider again.
@@ -155,13 +156,16 @@ What a provider says about a person is kept per workspace in `scim_user`, writte
 instance workspace's token opens it, and it also writes `active`, one more
 `additionalField` on the user table (nullable, so every check is `active !== false`).
 God mode writes `active` too, from the users table, while no provider manages accounts
-(`accountsManagedByScim`: SCIM per workspace, or the instance workspace's SCIM set up with
-a token); while one does, `apps/api` answers god's switch with 409. An
-account with `active` false (`isAccountDeactivated`) is refused at sign-in by the
+(`accountsManagedByScim`: SCIM per workspace alone, or the instance workspace's SCIM set
+up with a token); while one does, `apps/api` answers god's switch with 409. An account
+with `active` false (`isAccountDeactivated`) is refused at sign-in by the
 `session.create.before` hook with `ACCOUNT_DEACTIVATED`, which covers every sign-in method
 at once; `apps/api` refuses the sessions and keys it already holds. On, a workspace's
 provider decides who is in the workspace, not who has an account, `active` is not read,
-and nothing here refuses a session.
+and nothing here refuses a session. `setInstanceScimBeside()` keeps the instance
+workspace's provider, beside every other workspace's, as it is while off: acting on the
+whole instance and writing `active`. `instanceScimWorkspace()` names the workspace whose
+provider acts on the whole instance, or null when none does.
 
 `getScimSettings` / `rotateScimToken` / `verifyScimToken` hold the bearer token of each
 workspace that the SCIM endpoints in `apps/api` authenticate with. A token reads
@@ -203,14 +207,22 @@ receive its real owner.
 The registration gate (`assertRegistrationAllowed`) runs in
 `databaseHooks.user.create.before`, which every account creation passes, and that is what
 applies closed/invite-only to a Google, OIDC or magic-link sign-up. It refuses with
-`REGISTRATION_CLOSED` on a closed instance, `INVITE_ONLY` when the address has no pending
-invite, and `INVITE_EXPIRED` when its only invites have expired. That last one reveals that
-the address was invited, so it is given only where the address is proven (provider, magic
-link); the email form, open to anyone, gets `INVITE_ONLY`. Its `APIError`s carry a `code`
-because the provider callback and the magic link turn that into the `?error=` they redirect
-with; without one the callback fails the request instead (`invite-forms.test.ts` pins
-`INVITE_EXPIRED` and `INVITE_ONLY`). Agent bot users are written with a direct insert and never
-reach the hook.
+`REGISTRATION_CLOSED` on a closed instance, `EMAIL_DOMAIN_NOT_ALLOWED` when the address is
+not at one of `allowedEmailDomains` (an empty list admits any), `INVITE_ONLY` when the
+address has no pending invite, and `INVITE_EXPIRED` when its only invites have expired.
+That last one reveals that the address was invited, so it is given only where the address
+is proven (provider, magic link); the email form, open to anyone, gets `INVITE_ONLY`. Its
+`APIError`s carry a `code` because the provider callback and the magic link turn that into
+the `?error=` they redirect with; without one the callback fails the request instead
+(`invite-forms.test.ts` pins `INVITE_EXPIRED` and `INVITE_ONLY`). Agent bot users are
+written with a direct insert and never reach the hook.
+
+A domain in `allowedEmailDomains` matches the part of the address after the "@" exactly, so
+a subdomain is listed on its own. The list applies to new accounts only; the api also
+refuses to invite an address that has no account and is outside it, since it could not
+register. The gate asks `registrationEmailAllowed`, which checks the list unless a build
+installs its own policy with `setRegistrationEmailPolicy`, as one that lets a workspace
+keep domains of its own does to admit an address that workspace invited.
 
 ## API keys
 
@@ -274,6 +286,23 @@ the passkey and apiKey endpoints appear without any manual description. This is 
 from the planner's own OpenAPI docs at `/docs` (the `@elysiajs/swagger` spec, which does
 not see the catch-all auth handler). Docs-only: it adds no table, so `auth:generate` is
 not required for it.
+
+## What a build adds
+
+`@repo/auth/extensions` is the one module of this package that does not create the
+instance. A build calls `extendAuth({ plugins, schema, disabledPaths })` from it before
+the first request: the plugins join the core's, their drizzle tables join the adapter's
+schema by model name, and the paths are refused to requests while the server still calls
+them through `auth.api`. `./index.ts` creates the instance on its first use, not on
+import, so the call takes effect wherever a bundler puts the build's module; it reads the
+extensions then, and a later call throws. A plugin that needs origins trusted adds them
+itself, through its `init`. The plugins are typed as none, so `Auth` stays the core's
+type.
+
+`setRegistrationAdmission(fn)` is a build's say on an account the gate is about to create,
+by the request creating it (the better-auth endpoint context): true lets it past the
+registration mode and the allowed domains, as a sign-in through a provider the build
+manages that may create accounts; a throw turns it away. Without one the gate decides.
 
 ## Rules
 
