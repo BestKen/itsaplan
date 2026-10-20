@@ -38,6 +38,7 @@ import { settingsRoutes } from './modules/settings';
 import { godRoutes } from './modules/god';
 import { agentScheduleRoutes } from './modules/agents/schedules';
 import { modelPriceRoutes } from './modules/agents/prices';
+import { runnerQueueRoutes } from './modules/agents/queue';
 import { agentRunnerRoutes } from './modules/agents/runner';
 import { agentChatRoutes } from './modules/agents/chat';
 import { agentInvocationRoutes } from './modules/agents/invocation';
@@ -100,6 +101,7 @@ export const planner = new Elysia({ name: 'planner' })
   .use(agentScheduleRoutes)
   .use(modelPriceRoutes)
   .use(agentRunnerRoutes)
+  .use(runnerQueueRoutes)
   .use(agentChatRoutes)
   .use(agentInvocationRoutes)
   .use(dashboardRoutes)

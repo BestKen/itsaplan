@@ -1065,6 +1065,20 @@
       "when": 1792447270678,
       "tag": "0151_agent_invocation_url",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1792496405688,
+      "tag": "0152_agent_execution_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1792496411346,
+      "tag": "0153_external_run_traces",
+      "breakpoints": true
     }
   ]
 }

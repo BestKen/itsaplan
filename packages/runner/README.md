@@ -257,7 +257,7 @@ priority over both. An `agents` entry has priority over all three, for the field
 | `concurrency`    | `ITSAPLAN_CONCURRENCY`      | `1`                | Tasks at once, per agent. Queued runs and chat answers count apart |
 | `pollIntervalMs` | `ITSAPLAN_POLL_INTERVAL_MS` | `3000`             | Wait after an empty queue. Minimum 1000                            |
 | `timeoutMs`      | `ITSAPLAN_TIMEOUT_MS`       | `1800000`          | Time before the runner stops a task                                |
-| `outputFormat`   | `ITSAPLAN_OUTPUT_FORMAT`    | the preset's       | How the runner reads a chat answer                                 |
+| `outputFormat`   | `ITSAPLAN_OUTPUT_FORMAT`    | the preset's       | How the runner reads run and chat output                                 |
 | `listen`         | `ITSAPLAN_LISTEN`           | —                  | Port that receives the tasks. The runner does not poll for the agent |
 | `signingSecret`  | `ITSAPLAN_SIGNING_SECRET`   | —                  | The agent's signing secret. Required with `listen`                 |
 
@@ -319,7 +319,9 @@ Sessions below.
 ### The result
 
 Exit code `0` is a success. Any other code is a failure. The end of stderr then becomes
-the error. Stdout becomes the run's output in both cases.
+the error. In both cases the run's output is the answer: all of stdout with `outputFormat`
+`text`, and with an event stream format the text the agent wrote after its last tool call
+(see Chat below for the formats).
 
 ## Chat
 
@@ -374,3 +376,20 @@ Do everything else in WSL: Node, the coding agent, the config file, and the runn
 Copyright © 2026 Andrii Poluosmak.
 
 [Apache-2.0](LICENSE).
+
+### Issue run transcripts
+
+A server that advertises `traceEvents` on a run claim accepts its streamed messages
+and tool calls at `/agent-runs/:runId/events`. The runner reports numbered batches
+for the claimed attempt before reporting its result. Retries of a batch use the
+same offsets. A server without this capability still receives the final result.
+
+The `codex-jsonl` format records the session UUID from `thread.started`, shell
+commands, MCP calls and file changes. Plan shows an **Open in Codex** link for that
+attempt. The session must be available in the viewer's local Codex app or a
+connected host; the link does not publish or copy the Codex session. The events
+recorded in Plan are readable there independently of the local session.
+
+Each attempt records up to 2,000 events or 1 MB. Plan marks a truncated transcript;
+the final run result is reported separately. Plain-text commands provide messages
+and output, while tool details require a supported structured output format.
