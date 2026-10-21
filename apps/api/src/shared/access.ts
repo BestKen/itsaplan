@@ -13,7 +13,15 @@ import {
 } from '#modules/members/service';
 import { getTeamMembership, runsTeam, type TeamStanding } from '#modules/teams/service';
 import { projectWorkspaceGrant, workspaceGrant } from '#modules/workspaces/service';
-import { hasPermission, type PermissionAction, type PermissionResource } from './permissions';
+import {
+  hasPermission,
+  emptyPermissions,
+  resourceActions,
+  PERMISSION_RESOURCES,
+  type PermissionAction,
+  type PermissionResource,
+  type Permissions,
+} from './permissions';
 import {
   mergePermissions,
   projectAccess,
@@ -135,6 +143,42 @@ export async function assertProjectAdmin(
   if ((await getProjectAccess(project.id, current.id))?.role === 'owner') return;
   if (runsTeam((await getTeamAccess(project.teamId, current.id))?.role ?? null)) return;
   throw new HttpError(403, 'Only a project owner or a team owner or manager can do this');
+}
+
+// Caps what a member may hand out: the permissions of a role they assign (adding a
+// member, changing a role, inviting, renewing an invite, or copying an invite's link)
+// must not exceed their own. Without this, anyone
+// the member permission lets assign roles could grant a role more powerful than
+// theirs and act through it. A project owner, or an owner or manager of the team
+// (a workspace grant included), bypasses the matrix and may grant any of the team's roles.
+export async function mayGrantPermissions(
+  project: ProjectRow,
+  user: AuthUser | undefined | null,
+  target: Permissions,
+): Promise<boolean> {
+  const current = requireUser(user);
+  if (runsTeam((await getTeamAccess(project.teamId, current.id))?.role ?? null)) return true;
+  const access = await getProjectAccess(project.id, current.id);
+  if (access?.role === 'owner') return true;
+  const granter = access?.permissions ?? emptyPermissions();
+  for (const resource of PERMISSION_RESOURCES) {
+    for (const action of resourceActions(resource)) {
+      if (hasPermission(target, resource, action) && !hasPermission(granter, resource, action)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+export async function assertGrantablePermissions(
+  project: ProjectRow,
+  user: AuthUser | undefined | null,
+  target: Permissions,
+): Promise<void> {
+  if (!(await mayGrantPermissions(project, user, target))) {
+    throw new HttpError(403, 'You cannot grant a role with more permissions than your own');
+  }
 }
 
 // Resolves the :projectKey path param to a project the caller's team runs: an owner

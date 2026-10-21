@@ -192,6 +192,12 @@ Enforced declaratively through macros, never imperative calls in handlers.
   there. An invite is checked against its sender twice, once when it is made and again
   when it is accepted: the sender can be demoted or deleted while the link is out, and
   a link must not outlive the standing that issued it (409 on accept).
+  A custom role is capped the same way: adding, re-roling, inviting or renewing an invite
+  with a `roleId` goes through `assertGrantablePermissions`, which refuses a role that
+  grants more than the granter holds, and the project's invite list hides the link of
+  an invite whose role the viewer could not grant. A project owner, or an owner or
+  manager of the team, is not capped. Demoting or removing an owner needs
+  `assertProjectAdmin`.
 - `project_member.source` says which path a row came from: `modules/scim/reconcile.ts`
   only ever writes, re-roles or removes its own `'scim'` rows, and `members/` refuses to
   edit or remove one (409) because the next sync would undo the change. A project
