@@ -504,6 +504,10 @@ directly). Helpers in `src/__tests__/helpers/`: `api` (anonymous client), `authe
   either. The web app never imports these packages; it uses this API over HTTP.
 - CORS `origin` is the `trustedOrigins` list exported by `@repo/auth` — do not re-parse
   `APP_URL` here.
+- A state-changing request that carries the session cookie must come from a trusted
+  origin or the api's own; the `onRequest` guard in `app.ts` refuses the rest with 403
+  `CSRF_ORIGIN_REJECTED`. `/api/auth/*` is left to better-auth's own check, and requests
+  authenticated by api key or bearer token are not checked.
 - swagger `/docs` (planner) is separate from better-auth's `/api/auth/reference`; both
   stay reachable without a session.
 - Dev: `bun run dev`. Prod: the Dockerfile migrates, then starts the server; the compose files and the Helm chart run the migrations as a separate step and start only the server.
