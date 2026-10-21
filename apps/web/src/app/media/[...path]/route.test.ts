@@ -36,6 +36,43 @@ describe('public media proxy', () => {
     assert.equal(called, false);
   });
 
+  it('rejects encoded traversal before contacting the API', async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return new Response();
+    }) as typeof fetch;
+    for (const root of ['avatars', 'attachments', 'chat-attachments', 'initiative-attachments']) {
+      for (const segment of ['%252e%252e', '%2e%2e', '.%2e', '%252E%252E', '%2f', '%252f', '%5c']) {
+        // Next decodes each catch-all segment once before passing it to the handler.
+        const path = [root, decodeURIComponent(segment), 'docs', 'json'];
+        assert.equal((await get(path)).status, 404, path.join('/'));
+        const mediaPath = [root, decodeURIComponent(segment), 'raw'];
+        assert.equal((await get(mediaPath)).status, 404, mediaPath.join('/'));
+      }
+    }
+    assert.equal(calls, 0);
+  });
+
+  it('serves files from every public media root', async () => {
+    process.env.SERVICE_URL_API = 'http://api:3000';
+    const targets: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      targets.push(String(input));
+      return new Response('media');
+    }) as typeof fetch;
+    const roots = ['avatars', 'attachments', 'chat-attachments', 'initiative-attachments'];
+    for (const root of roots) {
+      const response = await get([root, PUBLIC_ID, 'raw']);
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), 'media');
+    }
+    assert.deepEqual(
+      targets,
+      roots.map((root) => 'http://api:3000/' + root + '/' + PUBLIC_ID + '/raw'),
+    );
+  });
+
   it('streams the exact media endpoint with the query and the cache validator', async () => {
     process.env.SERVICE_URL_API = 'http://api:3000';
     let capturedInput = '';
