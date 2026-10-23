@@ -181,6 +181,7 @@
       "name": "@repo/agent-tools",
       "version": "0.0.0",
       "dependencies": {
+        "@firecrawl/pdf-inspector": "^1.25.2",
         "@repo/net": "workspace:*",
         "zod": "^4.6.7",
       },
