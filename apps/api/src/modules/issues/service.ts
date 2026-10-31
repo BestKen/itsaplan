@@ -265,6 +265,7 @@ export interface IssueSearchHit {
   delegateUserId: string | null;
   priority: string | null;
   dueDate: string | null;
+  estimatePoints: number | null;
   estimateMinutes: number | null;
   loggedMinutes: number;
   labelIds: number[];
@@ -357,6 +358,7 @@ const hitColumns = {
   title: issue.title,
   priority: issue.priority,
   dueDate: issue.dueDate,
+  estimatePoints: issue.estimatePoints,
   estimateMinutes: issue.estimateMinutes,
   loggedMinutes,
   archivedAt: issue.archivedAt,
@@ -378,6 +380,7 @@ type HitRow = Omit<
   | 'updatedAt'
   | 'statusSince'
   | 'completedAt'
+  | 'estimatePoints'
 > & {
   archivedAt: Date | null;
   createdAt: Date;
@@ -386,6 +389,7 @@ type HitRow = Omit<
   completedAt: Date | null;
   parentSequenceNumber: number | null;
   parentTitle: string | null;
+  estimatePoints: string | null;
 };
 
 function toHit(
@@ -397,6 +401,7 @@ function toHit(
     completedAt,
     parentSequenceNumber,
     parentTitle,
+    estimatePoints,
     ...r
   }: HitRow,
   projectKey: string,
@@ -419,6 +424,7 @@ function toHit(
     updatedAt: iso(updatedAt),
     statusSince: iso(statusSince),
     completedAt: completedAt ? iso(completedAt) : null,
+    estimatePoints: numOrNull(estimatePoints),
   };
 }
 
